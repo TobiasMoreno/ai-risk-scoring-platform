@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.prediction import RiskScoreRequest, RiskScoreResponse
-from app.services.prediction_service import PredictionService, get_prediction_service
+from app.services.model_service import ModelService, get_model_service
 
 router = APIRouter(tags=["predictions"])
 
@@ -9,9 +9,9 @@ router = APIRouter(tags=["predictions"])
 @router.post("/risk-score", response_model=RiskScoreResponse)
 def create_risk_score(
     payload: RiskScoreRequest,
-    service: PredictionService = Depends(get_prediction_service),
+    service: ModelService = Depends(get_model_service),
 ) -> RiskScoreResponse:
-    return service.score(payload)
+    return service.predict(payload)
 
 
 @router.get("/predictions/{prediction_id}")

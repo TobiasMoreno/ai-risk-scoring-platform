@@ -21,7 +21,7 @@ Semana en curso: **S1 — Fundamentos + FastAPI** (ver [docs/semana-1.md](docs/s
 
 ---
 
-> ⚠️ **El scoring es mockeado en v0.1.** `risk_score = clip(debt / income, 0, 1)` bucketizado en `low / medium / high`. No es un modelo real. `model_version` viene fijado a `mock-0.1` para señalarlo. El modelo Scikit-learn entra en S2 (`v0.2`).
+> ⚠️ **Modelo de juguete (v0.2).** El scoring usa un `LogisticRegression` (Scikit-learn) entrenado sobre un **dataset sintético**. No es predictivo en producción; el objetivo es ejercitar el ciclo entrenamiento → serialización → carga. `model_version` viene de `.env` (`MODEL_VERSION=v0.2.0` por default).
 >
 > `GET /predictions/{id}` responde **501 Not Implemented** hasta que entre persistencia en S3 (`v0.3`).
 
@@ -39,11 +39,24 @@ python -m venv .venv
 # dependencias
 pip install -r requirements.txt
 
+# entrenar el modelo (necesario antes de arrancar)
+python -m app.models.train_model
+
 # correr la API
 uvicorn app.main:app --reload
 ```
 
 API local: http://localhost:8000 — docs en http://localhost:8000/docs
+
+### Re-entrenar el modelo
+
+El binario `app/models/risk_model.joblib` está **gitignored**: cada clone fresco debe ejecutarlo una vez antes del primer `uvicorn`.
+
+```powershell
+python -m app.models.train_model
+```
+
+Imprime métricas (accuracy / precision / recall / F1 / confusion matrix) sobre el split de test y guarda el pipeline `StandardScaler → LogisticRegression`. Si el archivo no existe al arrancar, la API **falla al startup** con `FileNotFoundError` — comportamiento intencional.
 
 ### Tests
 

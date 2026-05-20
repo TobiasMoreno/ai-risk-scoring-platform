@@ -3,6 +3,8 @@ from uuid import UUID
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import TEST_MODEL_VERSION
+
 
 @pytest.mark.anyio
 async def test_risk_score_low(client: AsyncClient) -> None:
@@ -13,7 +15,7 @@ async def test_risk_score_low(client: AsyncClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["risk_level"] == "low"
-    assert body["model_version"] == "mock-0.1"
+    assert body["model_version"] == TEST_MODEL_VERSION
     assert 0.0 <= body["risk_score"] <= 1.0
     assert body["risk_score"] == pytest.approx(0.1)
     UUID(body["request_id"])  # raises if not a valid UUID
@@ -68,3 +70,20 @@ async def test_get_prediction_returns_501(client: AsyncClient) -> None:
     body = response.json()
     assert "detail" in body
     assert "not implemented" in body["detail"].lower()
+
+
+@pytest.mark.anyio
+async def test_risk_score_returns_score_in_range_and_consistent_level(
+    client: AsyncClient,
+) -> None:
+    payload = {"income": 3000, "age": 35, "debt": 1500, "employment_years": 3}
+
+    response = await client.post("/risk-score", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    score = body["risk_score"]
+    assert 0.0 <= score <= 1.0
+    expected_level = "low" if score < 0.33 else "medium" if score < 0.66 else "high"
+    assert body["risk_level"] == expected_level
+    assert body["model_version"] == TEST_MODEL_VERSION

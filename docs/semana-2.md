@@ -54,15 +54,15 @@ class ModelService:
 
 ## Tareas
 
-- [ ] Agregar `scikit-learn`, `joblib`, `numpy`, `pandas` a `requirements.txt`.
-- [ ] Script `train_model.py` que genera, entrena, evalúa y guarda.
-- [ ] `ModelService` con load + predict.
-- [ ] Cargar modelo en `app.main` con `@app.on_event("startup")` o `lifespan`.
-- [ ] Endpoint `POST /risk-score` consume el modelo real.
-- [ ] Test que mockea `ModelService` (no entrena en cada test).
-- [ ] Test que valida que la respuesta tiene `model_version` y `risk_score` en [0,1].
-- [ ] Documentar en README cómo re-entrenar el modelo.
-- [ ] Commit + tag `v0.2`.
+- [x] Agregar `scikit-learn`, `joblib`, `numpy`, `pandas` a `requirements.txt`.
+- [x] Script `train_model.py` que genera, entrena, evalúa y guarda.
+- [x] `ModelService` con load + predict.
+- [x] Cargar modelo en `app.main` con `@app.on_event("startup")` o `lifespan`.
+- [x] Endpoint `POST /risk-score` consume el modelo real.
+- [x] Test que mockea `ModelService` (no entrena en cada test).
+- [x] Test que valida que la respuesta tiene `model_version` y `risk_score` en [0,1].
+- [x] Documentar en README cómo re-entrenar el modelo.
+- [x] Commit + tag `v0.2`.
 
 ---
 

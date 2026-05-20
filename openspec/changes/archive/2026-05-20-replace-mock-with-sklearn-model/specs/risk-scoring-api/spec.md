@@ -1,16 +1,4 @@
-# risk-scoring-api Specification
-
-## Purpose
-Provides a FastAPI HTTP service that exposes risk scoring functionality for consumer financial profiles. The service uses a Scikit-learn pipeline (`StandardScaler → LogisticRegression`) trained offline and loaded once at startup to produce probability-based risk scores. The previous mock implementation is historic and has been replaced by this ML-backed version, while preserving the public contract (endpoints, schemas, error semantics).
-
-## Requirements
-
-### Requirement: Health endpoint
-The system SHALL expose `GET /health` that returns HTTP 200 with body `{"status": "ok"}` siempre que el proceso esté vivo. No depende de recursos externos.
-
-#### Scenario: Health check responds OK
-- **WHEN** un cliente hace `GET /health`
-- **THEN** el servicio responde `200 OK` con `Content-Type: application/json` y body exactamente `{"status": "ok"}`
+## MODIFIED Requirements
 
 ### Requirement: Risk scoring (ML model)
 The system SHALL exponer `POST /risk-score` que acepta un payload JSON con los campos `income` (float > 0), `age` (int, 18–100 inclusive), `debt` (float ≥ 0) y `employment_years` (int ≥ 0), y devuelve un `RiskScoreResponse` con `request_id` (UUID v4 generado en servidor), `risk_score` (float en [0, 1]), `risk_level` (uno de `"low" | "medium" | "high"`) y `model_version` (string).
@@ -38,19 +26,7 @@ El modelo MUST cargarse **una sola vez al startup** del proceso (vía `lifespan`
 - **WHEN** se envía un payload al que le falta cualquiera de los cuatro campos requeridos
 - **THEN** el servicio responde `422 Unprocessable Entity`
 
-### Requirement: Prediction lookup placeholder
-The system SHALL exponer `GET /predictions/{id}` como placeholder de la futura capacidad de persistencia. Mientras no exista almacenamiento, MUST responder `501 Not Implemented` con un body explicativo.
-
-#### Scenario: Lookup is not implemented
-- **WHEN** un cliente hace `GET /predictions/{cualquier-id}`
-- **THEN** el servicio responde `501 Not Implemented` con un body JSON que incluye un campo `detail` describiendo que la funcionalidad aún no está disponible
-
-### Requirement: OpenAPI documentation
-The system SHALL publicar la documentación OpenAPI generada por FastAPI en `/docs` (Swagger UI) y `/openapi.json`, reflejando los schemas Pydantic de request y response.
-
-#### Scenario: Docs are reachable
-- **WHEN** un cliente hace `GET /docs`
-- **THEN** el servicio responde `200 OK` con HTML de Swagger UI listando los tres endpoints (`/health`, `/risk-score`, `/predictions/{id}`)
+## ADDED Requirements
 
 ### Requirement: Model loading at startup
 The system SHALL cargar el modelo serializado (`app/models/risk_model.joblib` por defecto, configurable vía `Settings.model_path` / `MODEL_PATH`) durante el `lifespan` de la aplicación, antes de aceptar requests. Si la carga falla (archivo ausente, archivo corrupto, incompatibilidad de versión de scikit-learn), el proceso MUST abortar el startup con un error explícito; NO SE PERMITE servir requests con un modelo no cargado.
