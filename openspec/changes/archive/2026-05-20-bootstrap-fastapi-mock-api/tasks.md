@@ -54,6 +54,6 @@
 
 ## 10. Cierre
 
-- [ ] 10.1 Commit: `feat(api): scaffold FastAPI service with mock risk scoring`
-- [ ] 10.2 Tag `v0.1`
-- [ ] 10.3 Marcar tareas del roadmap (`docs/semana-1.md`) y dejar listo para archivar este change con `/opsx:archive`
+- [x] 10.1 Commit: `feat(api): scaffold FastAPI service with mock risk scoring`
+- [x] 10.2 Tag `v0.1`
+- [x] 10.3 Marcar tareas del roadmap (`docs/semana-1.md`) y dejar listo para archivar este change con `/opsx:archive`
