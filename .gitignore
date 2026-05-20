@@ -37,3 +37,4 @@ data/processed/
 
 # Docker
 docker-compose.override.yml
+settings.local.json

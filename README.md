@@ -21,6 +21,10 @@ Semana en curso: **S1 — Fundamentos + FastAPI** (ver [docs/semana-1.md](docs/s
 
 ---
 
+> ⚠️ **El scoring es mockeado en v0.1.** `risk_score = clip(debt / income, 0, 1)` bucketizado en `low / medium / high`. No es un modelo real. `model_version` viene fijado a `mock-0.1` para señalarlo. El modelo Scikit-learn entra en S2 (`v0.2`).
+>
+> `GET /predictions/{id}` responde **501 Not Implemented** hasta que entre persistencia en S3 (`v0.3`).
+
 ## Cómo empezar
 
 1. Leer [docs/setup.md](docs/setup.md) — instalación de Python, Docker, Poetry/uv en Windows.
@@ -32,7 +36,7 @@ Semana en curso: **S1 — Fundamentos + FastAPI** (ver [docs/semana-1.md](docs/s
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# dependencias (cuando exista pyproject.toml / requirements.txt)
+# dependencias
 pip install -r requirements.txt
 
 # correr la API
@@ -40,6 +44,19 @@ uvicorn app.main:app --reload
 ```
 
 API local: http://localhost:8000 — docs en http://localhost:8000/docs
+
+### Tests
+
+```powershell
+pytest
+```
+
+### Docker
+
+```powershell
+docker build -t risk-api .
+docker run --rm -p 8000:8000 risk-api
+```
 
 ---
 

@@ -84,16 +84,16 @@ ai-risk-scoring-platform/
 
 ## Tareas
 
-- [ ] Crear `requirements.txt` con FastAPI + uvicorn + pydantic + pytest + httpx.
-- [ ] Crear estructura de carpetas de arriba.
-- [ ] Implementar `GET /health`.
-- [ ] Implementar `POST /risk-score` con lógica mockeada.
-- [ ] Validación con Pydantic (campos, rangos, tipos).
-- [ ] Tests: happy path + 422 por input inválido + health.
-- [ ] Dockerfile + verificar build local.
-- [ ] README con instrucciones de correr y testear.
-- [ ] Commit inicial: `chore: initialize FastAPI project structure`.
-- [ ] Tag `v0.1`.
+- [x] Crear `requirements.txt` con FastAPI + uvicorn + pydantic + pytest + httpx.
+- [x] Crear estructura de carpetas de arriba.
+- [x] Implementar `GET /health`.
+- [x] Implementar `POST /risk-score` con lógica mockeada.
+- [x] Validación con Pydantic (campos, rangos, tipos).
+- [x] Tests: happy path + 422 por input inválido + health.
+- [x] Dockerfile + verificar build local.
+- [x] README con instrucciones de correr y testear.
+- [x] Commit inicial: `chore: initialize FastAPI project structure`.
+- [x] Tag `v0.1`.
 
 ---
 
