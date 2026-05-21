@@ -57,4 +57,4 @@
 - [x] 8.4 Agregar `docs/decisions.md` ADR-lite: "Por qué RabbitMQ + aio-pika para batch" (resumen de design.md).
 - [x] 8.5 Crear `docs/semana-5.md` con un resumen breve del sprint (qué se construyó, cómo testearlo localmente).
 - [x] 8.6 Verificar `openspec validate batch-rabbitmq-worker` pasa.
-- [ ] 8.7 Tag `v0.5` después del merge a main.
+- [x] 8.7 Tag `v0.5` después del merge a main.

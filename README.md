@@ -8,7 +8,7 @@ Backend platform que expone un modelo simple de **risk scoring** en condiciones 
 
 ## Estado actual
 
-Semana en curso: **S5 — Cola + worker asincrónico** (ver [docs/semana-5.md](docs/semana-5.md)).
+Semana en curso: **S6 — Observabilidad + portfolio** (ver [docs/semana-6.md](docs/semana-6.md)).
 
 | Semana | Tema                                  | Tag    | Estado    |
 | ------ | ------------------------------------- | ------ | --------- |
@@ -16,8 +16,8 @@ Semana en curso: **S5 — Cola + worker asincrónico** (ver [docs/semana-5.md](d
 | S2     | Modelo Scikit-learn + inferencia real | `v0.2` | hecho     |
 | S3     | PostgreSQL + historial                | `v0.3` | hecho     |
 | S4     | Jobs batch + CSV                      | `v0.4` | hecho     |
-| S5     | Cola + worker asincrónico             | `v0.5` | en curso  |
-| S6     | Observabilidad + portfolio            | `v1.0` | pendiente |
+| S5     | Cola + worker asincrónico             | `v0.5` | hecho     |
+| S6     | Observabilidad + portfolio            | `v1.0` | en curso  |
 
 ---
 
@@ -46,8 +46,11 @@ alembic upgrade head
 # entrenar el modelo (necesario antes de arrancar)
 python -m app.models.train_model
 
-# correr la API
+# correr la API (terminal 1)
 uvicorn app.main:app --reload
+
+# correr el worker batch (terminal 2)
+python -m app.worker.main
 ```
 
 API local: http://localhost:8000 — docs en http://localhost:8000/docs
@@ -102,8 +105,8 @@ alembic downgrade -1
 ### Tests
 
 ```powershell
-# todos (requiere Postgres up + alembic upgrade head)
-pytest
+# todos (requiere Postgres up + alembic upgrade head; usar --basetemp si Windows bloquea Temp)
+pytest --basetemp .pytest_tmp
 
 # solo unit (sin DB)
 pytest -m "not integration"
@@ -135,8 +138,11 @@ State machine: `PENDING → PROCESSING → (COMPLETED | FAILED)`. `FAILED` sólo
 ### Docker
 
 ```powershell
-docker build -t risk-api .
-docker run --rm -p 8000:8000 risk-api
+# recomendado: stack completo con DB, RabbitMQ, API y worker
+docker compose up -d --build
+
+# ver logs de API y worker
+docker compose logs -f api worker
 ```
 
 ---
