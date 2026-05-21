@@ -1,0 +1,6 @@
+income,age,debt,employment_years,external_id
+5000,30,800,4,ext-001
+0,25,500,2,ext-002
+8000,45,1200,15,ext-003
+2000,,100,1,ext-004
+12000,50,3000,20,ext-005

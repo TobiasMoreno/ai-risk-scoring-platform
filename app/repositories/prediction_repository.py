@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, func, select, text
+from sqlalchemy import asc, desc, func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.models import PredictionRequest
@@ -32,6 +33,8 @@ class PredictionRepository:
         model_version: str,
         latency_ms: int,
         source: str = "online",
+        job_id: UUID | None = None,
+        external_id: str | None = None,
     ) -> PredictionRequest:
         row = PredictionRequest(
             request_id=request_id,
@@ -40,14 +43,63 @@ class PredictionRepository:
             model_version=model_version,
             latency_ms=latency_ms,
             source=source,
+            job_id=job_id,
+            external_id=external_id,
         )
         self._session.add(row)
         self._session.flush()
         return row
 
+    def save_batch_row(
+        self,
+        *,
+        request_id: UUID,
+        input_payload: dict[str, Any],
+        prediction: dict[str, Any],
+        model_version: str,
+        latency_ms: int,
+        job_id: UUID,
+        external_id: str | None,
+    ) -> bool:
+        """Insert a batch prediction; return True if inserted, False on idempotency conflict."""
+        stmt = (
+            pg_insert(PredictionRequest)
+            .values(
+                request_id=request_id,
+                input_payload=input_payload,
+                prediction=prediction,
+                model_version=model_version,
+                latency_ms=latency_ms,
+                source="batch",
+                job_id=job_id,
+                external_id=external_id,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["job_id", "external_id"],
+                index_where=text(
+                    "job_id IS NOT NULL AND external_id IS NOT NULL"
+                ),
+            )
+            .returning(PredictionRequest.id)
+        )
+        result = self._session.execute(stmt).scalar_one_or_none()
+        return result is not None
+
     def get_by_request_id(self, request_id: UUID) -> PredictionRequest | None:
         stmt = select(PredictionRequest).where(PredictionRequest.request_id == request_id)
         return self._session.execute(stmt).scalar_one_or_none()
+
+    def list_by_job(
+        self, job_id: UUID, limit: int = 50, offset: int = 0
+    ) -> list[PredictionRequest]:
+        stmt = (
+            select(PredictionRequest)
+            .where(PredictionRequest.job_id == job_id)
+            .order_by(asc(PredictionRequest.created_at), asc(PredictionRequest.id))
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(self._session.execute(stmt).scalars().all())
 
     def list_recent(self, limit: int = 50, offset: int = 0) -> list[PredictionRequest]:
         stmt = (

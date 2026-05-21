@@ -22,6 +22,8 @@ class PredictionRequest(Base):
     model_version: Mapped[str] = mapped_column(String, nullable=False)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False, server_default="online")
+    job_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -29,4 +31,33 @@ class PredictionRequest(Base):
     __table_args__ = (
         Index("ix_prediction_requests_created_at", "created_at"),
         Index("ix_prediction_requests_model_version", "model_version"),
+        Index("ix_prediction_requests_job_id", "job_id"),
+        Index(
+            "uq_prediction_requests_job_external",
+            "job_id",
+            "external_id",
+            unique=True,
+            postgresql_where="job_id IS NOT NULL AND external_id IS NOT NULL",
+        ),
+    )
+
+
+class BatchJob(Base):
+    __tablename__ = "batch_jobs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    job_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    total_records: Mapped[int] = mapped_column(Integer, nullable=False)
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_batch_jobs_status", "status"),
+        Index("ix_batch_jobs_created_at", "created_at"),
     )

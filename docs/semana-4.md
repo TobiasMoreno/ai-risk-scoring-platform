@@ -56,13 +56,13 @@ Flujo:
 
 ## Tareas
 
-- [ ] Migración Alembic: tabla `batch_jobs` + columna `external_id` en `prediction_requests`.
-- [ ] `BatchService` con `create_job`, `process_job`, `get_status`, `get_results`.
-- [ ] Endpoint POST con `UploadFile`.
-- [ ] BackgroundTask que procesa.
-- [ ] Tests con CSV de ejemplo (happy path + filas inválidas + reintento idempotente).
-- [ ] CSV de ejemplo en `tests/fixtures/`.
-- [ ] Documentar formato esperado del CSV.
+- [x] Migración Alembic: tabla `batch_jobs` + columna `external_id` en `prediction_requests`.
+- [x] `BatchService` con `create_job`, `process_job`, `get_status`, `get_results`.
+- [x] Endpoint POST con `UploadFile`.
+- [x] BackgroundTask que procesa.
+- [x] Tests con CSV de ejemplo (happy path + filas inválidas + reintento idempotente).
+- [x] CSV de ejemplo en `tests/fixtures/` (y `samples/` para el README).
+- [x] Documentar formato esperado del CSV.
 - [ ] Commit + tag `v0.4`.
 
 ---

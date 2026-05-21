@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from app.api.routes import health, metrics, predictions
+from app.api.routes import batch, health, metrics, predictions
 from app.config import get_settings
 from app.db.database import create_engine_from_settings, create_session_factory
 from app.services.model_service import ModelService
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(predictions.router)
+    app.include_router(batch.router)
     app.include_router(metrics.router)
     return app
 

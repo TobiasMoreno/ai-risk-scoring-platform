@@ -288,12 +288,122 @@ A — `id BIGSERIAL` PK, `request_id UUID UNIQUE`.
 
 ---
 
+## ADR-10 — Batch in-process con `BackgroundTasks` (no worker en S4)
+
+- **Fecha**: 2026-05-21
+- **Semana**: S4
+- **Estado**: aceptada (temporal — S5 introduce cola + worker)
+
+### Contexto
+Necesitamos procesar CSVs sin bloquear el response del cliente.
+
+### Opciones consideradas
+- A: `BackgroundTasks` de FastAPI (in-process, post-response).
+- B: Cola + worker externo desde ya.
+- C: `asyncio.create_task` manual.
+
+### Decisión
+A — `BackgroundTasks`.
+
+### Razón
+- Sin tráfico real en S4; un BackgroundTask por job alcanza.
+- API del cliente (state machine + endpoints) queda idéntica cuando S5 mueva el work a un worker — solo cambia quién corre `process_job`.
+- `BackgroundTasks` maneja exceptions y cleanup mejor que `asyncio.create_task` crudo.
+
+### Consecuencias
+- Crash de uvicorn → jobs `PROCESSING` quedan colgados; no hay reaper. S5 lo soluciona.
+- Latencia online puede sufrir si un job grande corre al mismo tiempo. Mitigación: chunks + tamaño máximo.
+
+---
+
+## ADR-11 — CSV con stdlib `csv.DictReader`, no pandas
+
+- **Fecha**: 2026-05-21
+- **Semana**: S4
+- **Estado**: aceptada
+
+### Contexto
+Parseo de CSVs con 4 columnas numéricas.
+
+### Opciones consideradas
+- A: `csv` stdlib + Pydantic.
+- B: `pandas.read_csv`.
+
+### Decisión
+A — stdlib.
+
+### Razón
+- pandas pesa ~30 MB y trae numpy/dtypes que no usamos.
+- DictReader es streaming → memoria O(chunk_size), no O(N).
+- Validación delegada a Pydantic (`RiskScoreRequest`), mismas reglas que el endpoint online.
+
+### Consecuencias
+- No tenemos `dtype inference` automático; Pydantic se encarga.
+- Si más adelante hay agregaciones por job, no perdemos nada — pandas se puede sumar localmente.
+
+---
+
+## ADR-12 — Idempotencia por UNIQUE parcial `(job_id, external_id)`
+
+- **Fecha**: 2026-05-21
+- **Semana**: S4
+- **Estado**: aceptada
+
+### Contexto
+Reintentar un job no debe duplicar filas. El `external_id` lo provee el cliente en el CSV.
+
+### Opciones consideradas
+- A: UNIQUE parcial `(job_id, external_id) WHERE job_id IS NOT NULL AND external_id IS NOT NULL`.
+- B: UNIQUE global por `external_id`.
+- C: Idempotencia en código (chequeo previo + INSERT).
+
+### Decisión
+A — UNIQUE parcial; el insert usa `ON CONFLICT DO NOTHING`.
+
+### Razón
+- DB como fuente de verdad evita races entre chunks paralelos.
+- Mismo `external_id` en jobs distintos es legítimo (equipos/contextos distintos).
+- Parcial porque las filas online no tienen `job_id`/`external_id`; queremos que el constraint sólo aplique a batch.
+
+### Consecuencias
+- Reprocesar el mismo CSV con el mismo `job_id` → 0 inserts nuevos, ninguno cuenta como `failed`.
+- Reprocesar con `job_id` distinto sí duplica — decisión consciente.
+
+---
+
+## ADR-13 — Semántica de `FAILED`: ninguna fila persistida
+
+- **Fecha**: 2026-05-21
+- **Semana**: S4
+- **Estado**: aceptada
+
+### Contexto
+¿Cuándo un job termina `COMPLETED` vs `FAILED`?
+
+### Opciones consideradas
+- A: `FAILED` sólo si `processed == 0 AND total_records > 0`.
+- B: `FAILED` si cualquier fila falla.
+- C: Estado mixto `PARTIAL`.
+
+### Decisión
+A — `FAILED` reservado para "no se persistió nada"; si al menos una fila entró, el job termina `COMPLETED` y el cliente mira `processed` vs `failed` para juzgar.
+
+### Razón
+- Estado del job comunica "se pudo procesar?", no "calidad de los datos".
+- Tres estados terminales (`COMPLETED`/`FAILED`/`PARTIAL`) complica la state machine sin ganar info — los contadores ya dicen lo mismo.
+- CSV vacío (`total_records=0`) termina `COMPLETED` (caso degenerado, no error).
+
+### Consecuencias
+- Cliente que quiere "todas pasaron" debe checkear `failed == 0`, no `status == COMPLETED`.
+- Documentado en specs y README.
+
+---
+
 <!-- Próximas entradas a medida que avanzan las semanas:
 
-## ADR-10 — Procesamiento batch in-process vs worker externo (S4)
-## ADR-11 — RabbitMQ vs Kafka (S5)
-## ADR-12 — Sync vs async en endpoint /risk-score (S5)
-## ADR-13 — structlog vs logging stdlib (S6)
-## ADR-14 — OpenTelemetry sí o no (S6)
+## ADR-14 — RabbitMQ vs Kafka (S5)
+## ADR-15 — Sync vs async en endpoint /risk-score (S5)
+## ADR-16 — structlog vs logging stdlib (S6)
+## ADR-17 — OpenTelemetry sí o no (S6)
 
 -->

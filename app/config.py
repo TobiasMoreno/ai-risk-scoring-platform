@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 5
 
+    batch_chunk_size: int = 1000
+    batch_max_upload_bytes: int = 10 * 1024 * 1024
+
 
 @lru_cache
 def get_settings() -> Settings:

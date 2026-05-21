@@ -10,10 +10,11 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.routes import health, metrics, predictions
+from app.api.routes import batch, health, metrics, predictions
 from app.config import get_settings
 from app.db.database import create_engine_from_settings, get_db
 from app.schemas.prediction import RiskLevel, RiskScoreRequest, RiskScoreResponse
+from app.services.batch_service import BatchService
 from app.services.model_service import PredictionResult, get_model_service
 
 _LOW_THRESHOLD = 0.33
@@ -57,6 +58,7 @@ def _build_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version=settings.app_version)
     app.include_router(health.router)
     app.include_router(predictions.router)
+    app.include_router(batch.router)
     app.include_router(metrics.router)
     return app
 
@@ -158,3 +160,54 @@ async def client_with_db(db_session: Session) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+# ---------- Batch fixtures: BackgroundTasks needs a real session_factory ----------
+
+
+@pytest.fixture
+def batch_session_factory(db_engine: Engine) -> Iterator[sessionmaker[Session]]:
+    """Real session factory bound to the live engine (no BEGIN/ROLLBACK isolation).
+
+    Batch jobs open their own sessions outside the request — they can't use
+    the per-test transactional session. We TRUNCATE before and after each test.
+    """
+    factory = sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+    with factory() as s:
+        s.execute(
+            text("TRUNCATE TABLE prediction_requests, batch_jobs RESTART IDENTITY")
+        )
+        s.commit()
+    try:
+        yield factory
+    finally:
+        with factory() as s:
+            s.execute(
+                text("TRUNCATE TABLE prediction_requests, batch_jobs RESTART IDENTITY")
+            )
+            s.commit()
+
+
+@pytest.fixture
+async def client_with_batch_db(
+    batch_session_factory: sessionmaker[Session],
+) -> AsyncIterator[AsyncClient]:
+    app = _build_app()
+    fake_model = FakeModelService()
+    app.state.model_service = fake_model
+    app.state.session_factory = batch_session_factory
+    app.dependency_overrides[get_model_service] = lambda: fake_model
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+def batch_service(
+    batch_session_factory: sessionmaker[Session],
+) -> BatchService:
+    return BatchService(
+        model_service=FakeModelService(),
+        session_factory=batch_session_factory,
+        chunk_size=1000,
+    )

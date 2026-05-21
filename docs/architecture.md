@@ -129,14 +129,18 @@ prediction_requests (
 batch_jobs (
   id              BIGSERIAL PRIMARY KEY,
   job_id          UUID UNIQUE NOT NULL,
-  status          TEXT NOT NULL,   -- PENDING | PROCESSING | COMPLETED | FAILED
-  total_records   INTEGER,
-  processed       INTEGER DEFAULT 0,
-  failed          INTEGER DEFAULT 0,
+  status          TEXT NOT NULL,                  -- PENDING | PROCESSING | COMPLETED | FAILED
+  total_records   INTEGER NOT NULL,
+  processed       INTEGER NOT NULL DEFAULT 0,
+  failed          INTEGER NOT NULL DEFAULT 0,
   started_at      TIMESTAMPTZ,
   finished_at     TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- En `prediction_requests` (S4): columnas `job_id UUID NULL` y `external_id TEXT NULL`
+-- + índice único parcial `(job_id, external_id) WHERE job_id IS NOT NULL AND external_id IS NOT NULL`
+-- para idempotencia por job sin afectar el path online.
 ```
 
 ---

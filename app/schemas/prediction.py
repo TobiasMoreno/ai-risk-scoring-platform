@@ -31,6 +31,8 @@ class PredictionRecordResponse(BaseModel):
     latency_ms: int
     source: str
     created_at: datetime
+    job_id: UUID | None = None
+    external_id: str | None = None
 
 
 class SummaryResponse(BaseModel):

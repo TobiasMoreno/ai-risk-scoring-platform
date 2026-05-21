@@ -114,6 +114,23 @@ pytest -m "not integration"
 pytest -m integration
 ```
 
+### Predicciones batch (CSV)
+
+`POST /batch-predictions` acepta un CSV con headers `income,age,debt,employment_years,external_id` (los primeros 4 obligatorios; `external_id` opcional, da idempotencia por job). El servidor responde `202` con `job_id` y procesa en background.
+
+```powershell
+# 1) Subir el CSV (devuelve job_id y 'Location' header)
+curl -F file=@samples/sample_batch.csv http://localhost:8000/batch-predictions
+
+# 2) Poll del estado
+curl http://localhost:8000/batch-predictions/<job_id>
+
+# 3) Descargar resultados (paginado)
+curl "http://localhost:8000/batch-predictions/<job_id>/results?limit=50&offset=0"
+```
+
+State machine: `PENDING → PROCESSING → (COMPLETED | FAILED)`. `FAILED` sólo si ninguna fila se persistió. Filas inválidas incrementan `failed` pero no abortan el job. Repetir el mismo `external_id` dentro de un job se descarta (UNIQUE parcial en DB). Default 10 MB por upload, 1000 filas por chunk — configurable vía `BATCH_MAX_UPLOAD_BYTES` y `BATCH_CHUNK_SIZE`.
+
 ### Docker
 
 ```powershell
