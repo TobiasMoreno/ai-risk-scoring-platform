@@ -1,16 +1,4 @@
-# risk-scoring-api Specification
-
-## Purpose
-Provides a FastAPI HTTP service that exposes risk scoring functionality for consumer financial profiles. The service uses a Scikit-learn pipeline (`StandardScaler → LogisticRegression`) trained offline and loaded once at startup to produce probability-based risk scores. Every prediction is persisted in PostgreSQL (table `prediction_requests`, backed by `TIMESTAMPTZ` `created_at`), and the service exposes lookup, listing and summary endpoints over that store. The previous mock implementation is historic and has been replaced by this ML- and DB-backed version, while preserving the public contract (endpoints, schemas, error semantics).
-
-## Requirements
-
-### Requirement: Health endpoint
-The system SHALL expose `GET /health` that returns HTTP 200 with body `{"status": "ok"}` siempre que el proceso esté vivo. No depende de recursos externos.
-
-#### Scenario: Health check responds OK
-- **WHEN** un cliente hace `GET /health`
-- **THEN** el servicio responde `200 OK` con `Content-Type: application/json` y body exactamente `{"status": "ok"}`
+## MODIFIED Requirements
 
 ### Requirement: Risk scoring (ML model)
 The system SHALL exponer `POST /risk-score` que acepta un payload JSON con los campos `income` (float > 0), `age` (int, 18–100 inclusive), `debt` (float ≥ 0) y `employment_years` (int ≥ 0), y devuelve un `RiskScoreResponse` con `request_id` (UUID v4 generado en servidor), `risk_score` (float en [0, 1]), `risk_level` (uno de `"low" | "medium" | "high"`) y `model_version` (string).
@@ -36,27 +24,13 @@ El registro persistido MUST incluir como mínimo: `request_id`, `input_payload` 
 - **WHEN** se envía un payload al que le falta cualquiera de los cuatro campos requeridos
 - **THEN** el servicio responde `422 Unprocessable Entity`
 
-### Requirement: OpenAPI documentation
-The system SHALL publicar la documentación OpenAPI generada por FastAPI en `/docs` (Swagger UI) y `/openapi.json`, reflejando los schemas Pydantic de request y response.
+## REMOVED Requirements
 
-#### Scenario: Docs are reachable
-- **WHEN** un cliente hace `GET /docs`
-- **THEN** el servicio responde `200 OK` con HTML de Swagger UI listando los tres endpoints (`/health`, `/risk-score`, `/predictions/{id}`)
+### Requirement: Prediction lookup placeholder
+**Reason**: La capacidad de lookup ya está implementada contra la tabla `prediction_requests`; el placeholder 501 deja de tener sentido.
+**Migration**: Los clientes que hacían `GET /predictions/{id}` recibían `501`; a partir de v0.3 reciben `200` con el registro persistido o `404` si no existe. Ver "Prediction lookup by request_id".
 
-### Requirement: Model loading at startup
-The system SHALL cargar el modelo serializado (`app/models/risk_model.joblib` por defecto, configurable vía `Settings.model_path` / `MODEL_PATH`) durante el `lifespan` de la aplicación, antes de aceptar requests. Si la carga falla (archivo ausente, archivo corrupto, incompatibilidad de versión de scikit-learn), el proceso MUST abortar el startup con un error explícito; NO SE PERMITE servir requests con un modelo no cargado.
-
-#### Scenario: Missing model file aborts startup
-- **WHEN** la aplicación intenta arrancar y `Settings.model_path` apunta a un archivo inexistente
-- **THEN** el startup falla con una excepción que identifica el path buscado, y el servicio NO queda escuchando
-
-#### Scenario: Corrupt model file aborts startup
-- **WHEN** la aplicación intenta arrancar y `joblib.load(Settings.model_path)` lanza una excepción
-- **THEN** el startup falla propagando la excepción original, y el servicio NO queda escuchando
-
-#### Scenario: Successful load is logged
-- **WHEN** la aplicación arranca con un modelo válido
-- **THEN** el log incluye un mensaje con `model_version` y `model_path` confirmando la carga, antes de que el servidor empiece a aceptar requests
+## ADDED Requirements
 
 ### Requirement: Prediction lookup by request_id
 The system SHALL exponer `GET /predictions/{request_id}` donde `request_id` MUST ser un UUID válido. Devuelve `200 OK` con el registro persistido (request_id, input_payload, prediction, model_version, latency_ms, source, created_at) o `404 Not Found` si no existe.

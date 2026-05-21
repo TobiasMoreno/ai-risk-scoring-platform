@@ -63,16 +63,6 @@ async def test_risk_score_rejects_missing_field(client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
-async def test_get_prediction_returns_501(client: AsyncClient) -> None:
-    response = await client.get("/predictions/abc")
-
-    assert response.status_code == 501
-    body = response.json()
-    assert "detail" in body
-    assert "not implemented" in body["detail"].lower()
-
-
-@pytest.mark.anyio
 async def test_risk_score_returns_score_in_range_and_consistent_level(
     client: AsyncClient,
 ) -> None:

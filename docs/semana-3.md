@@ -79,17 +79,17 @@ GET /metrics/summary         → total, latencia promedio, distribución de risk
 
 ## Tareas
 
-- [ ] Agregar `sqlalchemy`, `psycopg[binary]`, `alembic` a `requirements.txt`.
-- [ ] `docker-compose.yml` con PostgreSQL.
-- [ ] `app/db/database.py` con engine + session factory.
-- [ ] Modelos SQLAlchemy.
-- [ ] Alembic init + primera migración.
-- [ ] `PredictionRepository` con tests (usando DB de test o `pytest-postgresql`).
-- [ ] `prediction_service` guarda después de predecir.
-- [ ] Endpoints de consulta.
-- [ ] Tests de integración (al menos con SQLite in-memory si la DB real complica).
-- [ ] Documentar cómo levantar la DB y aplicar migraciones.
-- [ ] Commit + tag `v0.3`.
+- [x] Agregar `sqlalchemy`, `psycopg[binary]`, `alembic` a `requirements.txt`.
+- [x] `docker-compose.yml` con PostgreSQL.
+- [x] `app/db/database.py` con engine + session factory.
+- [x] Modelos SQLAlchemy.
+- [x] Alembic init + primera migración.
+- [x] `PredictionRepository` con tests (usando DB de test o `pytest-postgresql`).
+- [x] `prediction_service` guarda después de predecir.
+- [x] Endpoints de consulta.
+- [x] Tests de integración (al menos con SQLite in-memory si la DB real complica).
+- [x] Documentar cómo levantar la DB y aplicar migraciones.
+- [x] Commit + tag `v0.3`.
 
 ---
 

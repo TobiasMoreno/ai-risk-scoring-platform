@@ -12,6 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # El binario del modelo debe existir antes de `docker build`.
 # Generarlo con: python -m app.models.train_model
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 
 EXPOSE 8000
 

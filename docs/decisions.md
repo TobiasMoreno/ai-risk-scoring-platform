@@ -177,13 +177,123 @@ A — fail-fast en startup. Binario `gitignored`; README documenta `python -m ap
 
 ---
 
+## ADR-06 — SQLAlchemy 2.x **sync**
+
+- **Fecha**: 2026-05-20
+- **Semana**: S3
+- **Estado**: aceptada
+
+### Contexto
+S3 introduce PostgreSQL. SQLAlchemy 2.x ofrece API sync (clásica) y async (con `asyncpg`).
+
+### Opciones consideradas
+- A: Sync (`psycopg` v3 + sessionmaker).
+- B: Async (`asyncpg` + AsyncSession).
+
+### Decisión
+A — sync.
+
+### Razón
+- Async exige que **todo** el stack sea async (engine, session, repo, service, routers). Mucho más código y más cuidado al testear.
+- FastAPI corre rutas sync en threadpool — válido y seguro.
+- A 10–100 RPS contra DB local, sync no es cuello de botella.
+- Repository pattern aísla un cambio futuro a async.
+
+### Consecuencias
+- Threads del pool pueden bloquearse en queries lentas — aceptable mientras no haya métricas que digan lo contrario.
+- Migrar a async, si se necesita, queda localizado en `db/database.py` y `repositories/`.
+
+---
+
+## ADR-07 — `JSONB` para input_payload y prediction
+
+- **Fecha**: 2026-05-20
+- **Semana**: S3
+- **Estado**: aceptada
+
+### Contexto
+La tabla `prediction_requests` guarda lo que entró y lo que salió. Hay que elegir entre columnas tipadas (`income REAL`, `risk_score REAL`, etc.) o JSONB.
+
+### Opciones consideradas
+- A: JSONB para `input_payload` y `prediction`.
+- B: Columnas tipadas para cada campo.
+- C: Mezcla — columnas para campos consultables, JSONB para extras.
+
+### Decisión
+A — JSONB para ambos blobs.
+
+### Razón
+- El modelo va a evolucionar: S4 puede sumar features, S5 puede sumar metadata. JSONB absorbe sin migración.
+- Queries actuales filtran por `request_id`, `created_at`, `model_version` (ya columnas) y `risk_level` (extraído de `prediction->>'risk_level'`).
+- Si en algún momento `risk_level` pesa, índice GIN o columna calculada.
+
+### Consecuencias
+- Sin tipado fuerte para el contenido del JSON — el contrato lo da Pydantic en la API.
+- Queries que filtren por contenido del JSON requieren índices ad-hoc cuando duela.
+
+---
+
+## ADR-08 — Repository pattern entre services y SQLAlchemy
+
+- **Fecha**: 2026-05-20
+- **Semana**: S3
+- **Estado**: aceptada
+
+### Contexto
+Servicios pueden hablar SQLAlchemy directo o pasar por una capa repository.
+
+### Opciones consideradas
+- A: Repository (`PredictionRepository` expone métodos de dominio).
+- B: Service ↔ Session directo.
+
+### Decisión
+A — repository.
+
+### Razón
+- Servicios mockean trivialmente el repo en tests unitarios.
+- Tests del repo van contra DB real, una sola vez.
+- Aísla el cambio sync → async (si llega) y el cambio de ORM (improbable pero posible).
+
+### Consecuencias
+- Una capa más en cada feature.
+- Boilerplate aceptado a cambio de testabilidad y aislamiento.
+
+---
+
+## ADR-09 — PK: `BIGSERIAL id` + `UUID request_id UNIQUE`
+
+- **Fecha**: 2026-05-20
+- **Semana**: S3
+- **Estado**: aceptada
+
+### Contexto
+La tabla necesita un PK estable y un identificador externo para el cliente.
+
+### Opciones consideradas
+- A: PK `BIGSERIAL` + `request_id UUID UNIQUE`.
+- B: PK `UUID` (v4 o v7).
+- C: PK compuesto.
+
+### Decisión
+A — `id BIGSERIAL` PK, `request_id UUID UNIQUE`.
+
+### Razón
+- `BIGSERIAL` ordena por inserción, 8 bytes, ideal para paginado por keyset.
+- `request_id UUID` es el identificador externo (cliente, logs, correlación).
+- Lookups por `request_id` son rápidos vía UNIQUE.
+
+### Consecuencias
+- Dos índices BTREE pequeños.
+- Si en el futuro se quiere keyset pagination con UUID v7 ordenable, hay opción de migrar — pero no es necesario.
+
+---
+
 <!-- Próximas entradas a medida que avanzan las semanas:
 
-## ADR-06 — ORM y patrón de acceso a datos (S3)
-## ADR-07 — Procesamiento batch in-process vs worker externo (S4)
-## ADR-08 — RabbitMQ vs Kafka (S5)
-## ADR-09 — Sync vs async en endpoint /risk-score (S5)
-## ADR-10 — structlog vs logging stdlib (S6)
-## ADR-11 — OpenTelemetry sí o no (S6)
+## ADR-10 — Procesamiento batch in-process vs worker externo (S4)
+## ADR-11 — RabbitMQ vs Kafka (S5)
+## ADR-12 — Sync vs async en endpoint /risk-score (S5)
+## ADR-13 — structlog vs logging stdlib (S6)
+## ADR-14 — OpenTelemetry sí o no (S6)
 
 -->

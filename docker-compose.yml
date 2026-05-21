@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-risk_scoring}
+      POSTGRES_USER: ${POSTGRES_USER:-risk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-risk} -d ${POSTGRES_DB:-risk_scoring}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    image: risk-api:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Inside the compose network the DB is reachable as host "postgres" on the internal port 5432.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-risk}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-risk_scoring}
+      MODEL_PATH: app/models/risk_model.joblib
+      MODEL_VERSION: ${MODEL_VERSION:-v0.2.0}
+      APP_NAME: ${APP_NAME:-AI Risk Scoring Platform}
+      APP_VERSION: ${APP_VERSION:-0.3.0}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    # Run pending migrations, then start uvicorn.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+volumes:
+  pgdata:

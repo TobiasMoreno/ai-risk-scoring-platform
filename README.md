@@ -39,6 +39,12 @@ python -m venv .venv
 # dependencias
 pip install -r requirements.txt
 
+# levantar PostgreSQL local (puerto 55432 por defecto, configurable en .env)
+docker compose up -d postgres
+
+# aplicar migraciones
+alembic upgrade head
+
 # entrenar el modelo (necesario antes de arrancar)
 python -m app.models.train_model
 
@@ -58,10 +64,54 @@ python -m app.models.train_model
 
 Imprime métricas (accuracy / precision / recall / F1 / confusion matrix) sobre el split de test y guarda el pipeline `StandardScaler → LogisticRegression`. Si el archivo no existe al arrancar, la API **falla al startup** con `FileNotFoundError` — comportamiento intencional.
 
+### Base de datos
+
+PostgreSQL corre en Docker (`docker-compose.yml`). El puerto mapeado es **55432** para no chocar con instalaciones nativas en 5432/5433.
+
+```powershell
+# solo DB (modo dev: la API corre con uvicorn en el host)
+docker compose up -d postgres
+
+# stack completo (DB + API juntos, API en :8000, migra automáticamente)
+docker compose up -d --build
+
+# parar (mantiene datos)
+docker compose stop
+
+# tirar todo (incluye volumen pgdata)
+docker compose down -v
+```
+
+El servicio `api` aplica `alembic upgrade head` al arrancar y luego levanta `uvicorn`.
+
+### Migraciones (Alembic)
+
+Cada cambio de modelo en `app/db/models.py` requiere una nueva revisión:
+
+```powershell
+# crear una nueva revisión autogenerada (revisar siempre el SQL resultante)
+alembic revision --autogenerate -m "<descripción>"
+
+# aplicar
+alembic upgrade head
+
+# rollback de la última
+alembic downgrade -1
+```
+
+`DATABASE_URL` se lee desde `.env` (ver `alembic/env.py`).
+
 ### Tests
 
 ```powershell
+# todos (requiere Postgres up + alembic upgrade head)
 pytest
+
+# solo unit (sin DB)
+pytest -m "not integration"
+
+# solo integration
+pytest -m integration
 ```
 
 ### Docker

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
@@ -27,6 +28,12 @@ def _bucket(score: float) -> RiskLevel:
     return "high"
 
 
+@dataclass
+class PredictionResult:
+    response: RiskScoreResponse
+    latency_ms: int
+
+
 class ModelService:
     def __init__(self, model_path: str, model_version: str) -> None:
         self._model_path = model_path
@@ -48,7 +55,7 @@ class ModelService:
     def model_version(self) -> str:
         return self._model_version
 
-    def predict(self, request: RiskScoreRequest) -> RiskScoreResponse:
+    def predict(self, request: RiskScoreRequest) -> PredictionResult:
         if self._pipeline is None:
             raise RuntimeError("ModelService.predict() called before load()")
         features = np.array(
@@ -56,20 +63,21 @@ class ModelService:
         )
         start = time.perf_counter()
         proba = self._pipeline.predict_proba(features)[0, 1]
-        latency_ms = (time.perf_counter() - start) * 1000.0
+        latency_ms = int(round((time.perf_counter() - start) * 1000.0))
         risk_score = float(max(0.0, min(1.0, proba)))
         logger.info(
-            "predict model_version=%s latency_ms=%.3f score=%.4f",
+            "predict model_version=%s latency_ms=%d score=%.4f",
             self._model_version,
             latency_ms,
             risk_score,
         )
-        return RiskScoreResponse(
+        response = RiskScoreResponse(
             request_id=uuid4(),
             risk_score=risk_score,
             risk_level=_bucket(risk_score),
             model_version=self._model_version,
         )
+        return PredictionResult(response=response, latency_ms=latency_ms)
 
 
 def get_model_service(request: Request) -> ModelService:
