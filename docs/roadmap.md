@@ -63,22 +63,22 @@ Detalle por semana en [semana-1.md](semana-1.md) → [semana-6.md](semana-6.md).
 
 ### Observabilidad
 
-- [ ] Tengo logs estructurados.
-- [ ] Tengo métricas de latencia.
-- [ ] Tengo métricas de errores.
-- [ ] Tengo métricas de cantidad de predicciones.
-- [ ] Tengo dashboard básico.
+- [x] Tengo logs estructurados.
+- [x] Tengo métricas de latencia.
+- [x] Tengo métricas de errores.
+- [x] Tengo métricas de cantidad de predicciones.
+- [x] Tengo dashboard básico.
 - [ ] Puedo explicar cómo investigaría un problema en producción.
 
 ### Portfolio
 
-- [ ] README profesional.
-- [ ] Diagrama de arquitectura.
-- [ ] Decisiones técnicas documentadas.
-- [ ] Trade-offs explícitos.
-- [ ] Tests.
-- [ ] Docker Compose.
-- [ ] Demo local funcionando.
+- [x] README profesional.
+- [x] Diagrama de arquitectura.
+- [x] Decisiones técnicas documentadas.
+- [x] Trade-offs explícitos.
+- [x] Tests.
+- [x] Docker Compose.
+- [x] Demo local funcionando.
 - [ ] Post de LinkedIn / journal explicando el proyecto.
 
 ---
@@ -100,6 +100,8 @@ Cosas que no entran en las 6 semanas pero serían el siguiente paso. Útiles si 
 - [ ] Sincronización a BigQuery para análisis.
 
 ### Observabilidad avanzada
+- [ ] OpenTelemetry con collector y trazas API → RabbitMQ → worker.
+- [ ] Alertas Prometheus/Grafana para p95, error rate y backlog.
 - [ ] Detección de data drift con `evidently` o métricas custom.
 - [ ] Alertas en Grafana con notificación.
 - [ ] Tracing distribuido completo con OpenTelemetry.

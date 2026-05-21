@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -18,3 +19,8 @@ def metrics_summary(session: Session = Depends(get_db)) -> SummaryResponse:
         by_risk_level=stats.by_risk_level,
         by_model_version=stats.by_model_version,
     )
+
+
+@router.get("/metrics", include_in_schema=False)
+def prometheus_metrics() -> Response:
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

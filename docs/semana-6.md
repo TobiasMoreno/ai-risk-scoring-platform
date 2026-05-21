@@ -6,6 +6,33 @@
 
 ---
 
+## Resumen del sprint
+
+- Logs JSON con `structlog` para API y worker.
+- Middleware HTTP con `X-Request-ID`, latencia por request y métricas por ruta.
+- Endpoint `GET /metrics` en formato Prometheus.
+- Métricas de predicciones, errores, latencia de inferencia y jobs batch.
+- Prometheus + Grafana en Docker Compose con dashboard provisionado.
+- README, arquitectura, roadmap y ADR actualizados para portfolio.
+
+## Cómo testear localmente
+
+```powershell
+docker compose up -d --build
+pytest --basetemp .pytest_tmp
+curl http://localhost:8000/metrics
+```
+
+URLs:
+
+- API: http://localhost:8000
+- Swagger: http://localhost:8000/docs
+- RabbitMQ: http://localhost:15672
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+---
+
 ## Qué estudiar
 
 - Logs estructurados (JSON, correlación por `request_id`).
@@ -79,17 +106,17 @@ Provisionar al menos uno con paneles:
 
 ## Tareas
 
-- [ ] Agregar `prometheus-client`, `structlog`, `opentelemetry-*` a `requirements.txt`.
-- [ ] Logger central con JSON output + `request_id` via middleware.
-- [ ] Middleware que mide latencia por endpoint.
-- [ ] Endpoint `/metrics` expuesto.
-- [ ] Definir e instrumentar las métricas listadas.
-- [ ] `prometheus.yml` scrapeando API y worker.
-- [ ] Grafana provisioning (dashboard como código).
-- [ ] Tests que verifican que `/metrics` devuelve formato Prometheus válido.
-- [ ] README profesional con: qué es, por qué, cómo correr, arquitectura, decisiones.
-- [ ] Diagrama de arquitectura final.
-- [ ] Sección "What I learned" en el README.
+- [x] Agregar `prometheus-client`, `structlog` a `requirements.txt`.
+- [x] Logger central con JSON output + `request_id` via middleware.
+- [x] Middleware que mide latencia por endpoint.
+- [x] Endpoint `/metrics` expuesto.
+- [x] Definir e instrumentar las métricas listadas.
+- [x] `prometheus.yml` scrapeando API.
+- [x] Grafana provisioning (dashboard como código).
+- [x] Tests que verifican que `/metrics` devuelve formato Prometheus válido.
+- [x] README profesional con: qué es, por qué, cómo correr, arquitectura, decisiones.
+- [x] Diagrama de arquitectura final.
+- [x] Sección "What I learned" en el README.
 - [ ] Post de LinkedIn / journal del proyecto (opcional pero recomendado).
 - [ ] Merge final a `main` + tag `v1.0`.
 

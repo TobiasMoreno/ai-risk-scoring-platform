@@ -12,6 +12,7 @@ from fastapi import Request
 from sklearn.pipeline import Pipeline
 
 from app.schemas.prediction import RiskLevel, RiskScoreRequest, RiskScoreResponse
+from app.observability.metrics import record_model_inference
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ class ModelService:
         )
         start = time.perf_counter()
         proba = self._pipeline.predict_proba(features)[0, 1]
-        latency_ms = int(round((time.perf_counter() - start) * 1000.0))
+        latency_seconds = time.perf_counter() - start
+        record_model_inference(latency_seconds)
+        latency_ms = int(round(latency_seconds * 1000.0))
         risk_score = float(max(0.0, min(1.0, proba)))
         logger.info(
             "predict model_version=%s latency_ms=%d score=%.4f",

@@ -8,7 +8,7 @@ Backend platform que expone un modelo simple de **risk scoring** en condiciones 
 
 ## Estado actual
 
-Semana en curso: **S6 — Observabilidad + portfolio** (ver [docs/semana-6.md](docs/semana-6.md)).
+Estado: **proyecto completo hasta S6 — Observabilidad + portfolio** (ver [docs/semana-6.md](docs/semana-6.md)).
 
 | Semana | Tema                                  | Tag    | Estado    |
 | ------ | ------------------------------------- | ------ | --------- |
@@ -17,7 +17,7 @@ Semana en curso: **S6 — Observabilidad + portfolio** (ver [docs/semana-6.md](d
 | S3     | PostgreSQL + historial                | `v0.3` | hecho     |
 | S4     | Jobs batch + CSV                      | `v0.4` | hecho     |
 | S5     | Cola + worker asincrónico             | `v0.5` | hecho     |
-| S6     | Observabilidad + portfolio            | `v1.0` | en curso  |
+| S6     | Observabilidad + portfolio            | `v1.0` | hecho     |
 
 ---
 
@@ -26,7 +26,7 @@ Semana en curso: **S6 — Observabilidad + portfolio** (ver [docs/semana-6.md](d
 ## Cómo empezar
 
 1. Leer [docs/setup.md](docs/setup.md) — instalación de Python, Docker, Poetry/uv en Windows.
-2. Leer [docs/semana-1.md](docs/semana-1.md) — qué construir esta semana y cómo.
+2. Leer [docs/semana-6.md](docs/semana-6.md) — observabilidad, dashboard y cierre de portfolio.
 3. Levantar el proyecto:
 
 ```powershell
@@ -73,7 +73,7 @@ PostgreSQL corre en Docker (`docker-compose.yml`). El puerto mapeado es **55432*
 # solo infra (modo dev: la API corre con uvicorn en el host)
 docker compose up -d postgres rabbitmq
 
-# stack completo (Postgres + RabbitMQ + API + worker, API en :8000, migra automáticamente)
+# stack completo (Postgres + RabbitMQ + API + worker + Prometheus + Grafana)
 docker compose up -d --build
 
 # parar (mantiene datos)
@@ -83,7 +83,7 @@ docker compose stop
 docker compose down -v
 ```
 
-El servicio `api` aplica `alembic upgrade head` al arrancar y luego levanta `uvicorn`. RabbitMQ expone AMQP en `:5672` y la UI de management en http://localhost:15672 (`guest`/`guest` por default).
+El servicio `api` aplica `alembic upgrade head` al arrancar y luego levanta `uvicorn`. RabbitMQ expone AMQP en `:5672` y la UI de management en http://localhost:15672 (`guest`/`guest` por default). Prometheus queda en http://localhost:9090 y Grafana en http://localhost:3000 (`admin`/`admin` por default).
 
 ### Migraciones (Alembic)
 
@@ -138,16 +138,24 @@ State machine: `PENDING → PROCESSING → (COMPLETED | FAILED)`. `FAILED` sólo
 ### Docker
 
 ```powershell
-# recomendado: stack completo con DB, RabbitMQ, API y worker
+# recomendado: stack completo con DB, RabbitMQ, API, worker, Prometheus y Grafana
 docker compose up -d --build
 
-# ver logs de API y worker
+# ver logs JSON de API y worker
 docker compose logs -f api worker
 ```
 
+### Observabilidad
+
+- `GET /metrics`: formato Prometheus para scraping.
+- `GET /metrics/summary`: resumen agregado desde PostgreSQL.
+- `X-Request-ID`: si el cliente lo envía, la API lo propaga; si no, genera uno y lo devuelve.
+- Prometheus scrapea `api:8000/metrics`.
+- Grafana provisiona el dashboard **AI Risk Platform Observability** con tasa de predicciones, latencias, errores, distribución de riesgo y jobs batch por estado.
+
 ---
 
-## Arquitectura objetivo (al final de S6)
+## Arquitectura final
 
 ```
 Client
@@ -156,7 +164,7 @@ Client
 FastAPI ── PostgreSQL
   │
   ▼
-Queue (RabbitMQ/Kafka) ──► Worker ──► ML Model ──► PostgreSQL
+Queue (RabbitMQ) ──► Worker ──► ML Model ──► PostgreSQL
                                           │
                                           ▼
                                   Logs + Metrics
@@ -175,8 +183,8 @@ Detalle en [docs/architecture.md](docs/architecture.md).
 - **API**: FastAPI + Pydantic
 - **ML**: Scikit-learn + Joblib
 - **DB**: PostgreSQL
-- **Cola**: RabbitMQ (o Kafka)
-- **Observabilidad**: Prometheus + Grafana + logs estructurados
+- **Cola**: RabbitMQ
+- **Observabilidad**: Prometheus + Grafana + structlog JSON
 - **Infra local**: Docker Compose
 - **Tests**: Pytest
 
@@ -201,6 +209,16 @@ Detalle en [docs/architecture.md](docs/architecture.md).
 ## Workflow recomendado
 
 - Una rama por semana: `semana-1`, `semana-2`, ...
-- Cierre de semana = merge a `main` + tag (`v0.1`, `v0.2`, ...).
+- Cierre de semana = merge a `main` + tag (`v0.1`, `v0.2`, ...), si aplica.
 - Actualizar [docs/decisions.md](docs/decisions.md) cada vez que se elige A en lugar de B.
 - Cada semana suma código _y_ docs. Si no está documentado, no está hecho.
+
+---
+
+## What I Learned
+
+- Cómo servir un modelo Scikit-learn desde una API FastAPI con validación y persistencia.
+- Cómo separar inferencia online de procesamiento batch con RabbitMQ y un worker dedicado.
+- Cómo diseñar idempotencia por `external_id` y recovery de jobs huérfanos.
+- Cómo instrumentar una API/worker con logs JSON, métricas Prometheus y dashboard Grafana.
+- Cómo documentar decisiones técnicas y trade-offs de una plataforma ML pequeña pero realista.

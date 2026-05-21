@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import time
 from typing import BinaryIO
 from uuid import UUID, uuid4
 
@@ -10,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import BatchJob, PredictionRequest
+from app.observability.metrics import record_batch_terminal, record_prediction
 from app.repositories.batch_job_repository import BatchJobRepository
 from app.repositories.prediction_repository import PredictionRepository
 from app.schemas.prediction import RiskScoreRequest
@@ -93,6 +95,7 @@ class BatchService:
     # ---------- Processing ----------
 
     def process_job(self, job_id: UUID, raw_bytes: bytes | None = None) -> None:
+        process_start = time.perf_counter()
         with self._session_factory() as session:
             repo = BatchJobRepository(session)
             job = repo.get_by_job_id(job_id)
@@ -112,6 +115,9 @@ class BatchService:
             if raw_bytes is None:
                 repo.mark_failed(job_id)
                 session.commit()
+                record_batch_terminal(
+                    "FAILED", time.perf_counter() - process_start
+                )
                 logger.error("process_job: job_id=%s has no csv_blob", job_id)
                 return
             total_records = job.total_records
@@ -165,6 +171,7 @@ class BatchService:
                 repo.mark_failed(job_id)
                 final_status = "FAILED"
             session.commit()
+        record_batch_terminal(final_status, time.perf_counter() - process_start)
 
         logger.info(
             "batch job done job_id=%s status=%s total=%d processed=%d failed=%d",
@@ -221,6 +228,12 @@ class BatchService:
                     )
                     if inserted:
                         processed += 1
+                        record_prediction(
+                            model_version=response.model_version,
+                            risk_level=response.risk_level,
+                            source="batch",
+                            latency_ms=result.latency_ms,
+                        )
                     else:
                         # Idempotency conflict — already processed, not a failure.
                         logger.info(

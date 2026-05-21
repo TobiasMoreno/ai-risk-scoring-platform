@@ -1,7 +1,7 @@
 # batch-job-queue Specification
 
 ## Purpose
-TBD - created by archiving change batch-rabbitmq-worker. Update Purpose after archive.
+Defines the durable RabbitMQ work queue and worker behavior for batch prediction jobs. The capability covers broker startup checks, durable publishing, manual ack/nack policy, bounded prefetch, persisted CSV payloads, orphan recovery, and preservation of the previous batch processing semantics outside the API process.
 ## Requirements
 ### Requirement: Broker connectivity at startup
 The worker process SHALL validar conectividad con RabbitMQ al startup, abriendo una conexión AMQP y declarando la cola de trabajo antes de empezar a consumir. Si la conexión falla, el proceso MUST abortar el startup con error explícito; NO SE PERMITE quedar idle con broker caído.
@@ -110,4 +110,3 @@ The worker, al consumir un mensaje, SHALL ejecutar la misma lógica de procesami
 - **GIVEN** un mensaje para un `job_id` se entrega dos veces al worker (por requeue o por recovery)
 - **AND** todas las filas del CSV tienen `external_id`
 - **THEN** el total de filas en `prediction_requests` para ese `job_id` permanece igual al número de `external_id` únicos del CSV
-

@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-import logging
-
+import structlog
 from sqlalchemy import text
 
 from app.config import get_settings
 from app.db.database import create_engine_from_settings, create_session_factory
+from app.observability import configure_logging
 from app.queue import RabbitConnection
 from app.services.model_service import ModelService
 from app.worker.consumer import consume_forever
 from app.worker.recovery import run_recovery
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def run() -> None:
     settings = get_settings()
+    configure_logging(settings.log_level)
 
     engine = create_engine_from_settings(settings)
     with engine.connect() as conn:
@@ -32,7 +32,7 @@ async def run() -> None:
 
     rabbit = RabbitConnection(settings)
     await rabbit.connect()
-    logger.info("worker connected queue=%s", settings.rabbitmq_queue_batch)
+    logger.info("worker_connected", queue=settings.rabbitmq_queue_batch)
 
     try:
         await run_recovery(

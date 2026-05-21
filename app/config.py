@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     app_name: str = "AI Risk Scoring Platform"
     app_version: str = "0.3.0"
+    log_level: str = "INFO"
     model_path: str = "app/models/risk_model.joblib"
     model_version: str = "v0.2.0"
 

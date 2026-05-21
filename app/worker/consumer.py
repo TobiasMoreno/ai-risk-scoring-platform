@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import logging
 from json import JSONDecodeError
 from uuid import UUID
 
+import structlog
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,7 +13,7 @@ from app.services.batch_service import BatchValidationError
 from app.services.model_service import ModelService
 from app.worker.processor import process_job
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def handle_message(
@@ -27,7 +27,7 @@ async def handle_message(
     try:
         payload = json.loads(message.body.decode("utf-8"))
         job_id = UUID(str(payload["job_id"]))
-        logger.info("batch job consumed job_id=%s", job_id)
+        logger.info("batch_job_consumed", job_id=str(job_id))
         await process_job(
             job_id,
             model_service=model_service,
@@ -35,17 +35,32 @@ async def handle_message(
             chunk_size=chunk_size,
         )
     except (JSONDecodeError, KeyError, ValueError, BatchValidationError) as exc:
-        logger.warning("batch job nacked requeue=false job_id=%s error=%s", job_id, exc)
+        logger.warning(
+            "batch_job_nacked",
+            job_id=str(job_id) if job_id else None,
+            requeue=False,
+            error=str(exc),
+        )
         await message.nack(requeue=False)
     except OperationalError as exc:
-        logger.exception("batch job nacked requeue=true job_id=%s error=%s", job_id, exc)
+        logger.exception(
+            "batch_job_nacked",
+            job_id=str(job_id) if job_id else None,
+            requeue=True,
+            error=str(exc),
+        )
         await message.nack(requeue=True)
     except Exception as exc:  # noqa: BLE001
-        logger.exception("batch job nacked requeue=true job_id=%s error=%s", job_id, exc)
+        logger.exception(
+            "batch_job_nacked",
+            job_id=str(job_id) if job_id else None,
+            requeue=True,
+            error=str(exc),
+        )
         await message.nack(requeue=True)
     else:
         await message.ack()
-        logger.info("batch job acked job_id=%s", job_id)
+        logger.info("batch_job_acked", job_id=str(job_id))
 
 
 async def consume_forever(
@@ -66,3 +81,4 @@ async def consume_forever(
                 session_factory=session_factory,
                 chunk_size=chunk_size,
             )
+import structlog

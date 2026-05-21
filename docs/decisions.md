@@ -436,3 +436,31 @@ RabbitMQ encaja con el patron work-queue: una cola, N consumers, ack manual y re
 - `csv_blob` vive temporalmente en DB para que API y worker no dependan de filesystem compartido.
 - El worker puede escalar horizontalmente y hace recovery de jobs huerfanos al startup.
 - No hay DLQ sofisticada en S5; mensajes de datos invalidos se nackean sin requeue y quedan marcados `FAILED`.
+
+---
+
+## ADR-15 - Observabilidad: prometheus-client + structlog
+
+- **Fecha**: 2026-05-21
+- **Semana**: S6
+- **Estado**: aceptada
+
+### Contexto
+El proyecto ya procesa inferencia online y batch, pero para presentarlo como plataforma hace falta ver latencia, volumen, errores y eventos operativos sin leer la base manualmente.
+
+### Opciones consideradas
+- A: `prometheus-client` + `structlog`.
+- B: OpenTelemetry completo con collector.
+- C: Logs stdlib + endpoint JSON propio.
+
+### Decision
+A: exponer `/metrics` en formato Prometheus con `prometheus-client` y emitir logs JSON con `structlog`.
+
+### Razon
+Prometheus/Grafana es el stack mas reconocible para demo local y entrevistas. `prometheus-client` evita errores de formato y `structlog` permite logs consistentes con contexto (`request_id`, `job_id`, `model_version`, `latency_ms`). OpenTelemetry es valioso, pero sumar collector/exporters/traces en S6 agrega complejidad que no cambia el aprendizaje principal.
+
+### Consecuencias
+- La API expone metricas scrapeables en `/metrics`.
+- Docker Compose levanta Prometheus y Grafana con dashboard provisionado.
+- Los logs son JSON y aptos para agregacion futura.
+- Tracing distribuido queda como extension post-v1.0.

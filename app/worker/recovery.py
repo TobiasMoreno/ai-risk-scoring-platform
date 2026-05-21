@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta, timezone
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import BatchJob
 from app.queue import RabbitConnection
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def run_recovery(
@@ -31,5 +31,6 @@ async def run_recovery(
     for job_id in rows:
         await rabbit.publish_job(job_id)
         recovered.append(str(job_id))
-        logger.info("batch job recovered job_id=%s", job_id)
+        logger.info("batch_job_recovered", job_id=str(job_id))
     return recovered
+import structlog

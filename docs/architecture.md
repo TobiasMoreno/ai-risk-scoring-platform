@@ -24,14 +24,13 @@ Documento vivo. Se actualiza al final de cada semana junto con [decisions.md](de
             sync write  │           │ publish event
                         ▼           ▼
                 ┌──────────────┐  ┌──────────────┐
-                │  PostgreSQL  │  │ RabbitMQ /   │
-                │              │  │   Kafka      │
+                │  PostgreSQL  │  │  RabbitMQ    │
                 └──────────────┘  └──────┬───────┘
                         ▲                │ consume
                         │                ▼
                         │        ┌──────────────┐
                         │        │   Worker     │
-                        │        │ (Celery / pika)
+                        │        │ (aio-pika)
                         │        └──────┬───────┘
                         │               │
                         │               ▼
@@ -41,9 +40,9 @@ Documento vivo. Se actualiza al final de cada semana junto con [decisions.md](de
                                 └──────────────┘
 
       Observabilidad transversal:
-      FastAPI + Worker  ──►  logs estructurados (stdout)
-                        ──►  /metrics (Prometheus)
-                        ──►  Grafana dashboards
+      FastAPI + Worker  ──►  logs JSON (stdout, structlog)
+      FastAPI           ──►  /metrics (Prometheus)
+      Prometheus        ──►  Grafana dashboard
 ```
 
 ---
@@ -57,7 +56,7 @@ Documento vivo. Se actualiza al final de cada semana junto con [decisions.md](de
 | **Repository**    | Acceso a DB                            | SQLAlchemy            |
 | **Model service** | Cargar modelo, predecir, versionar     | Scikit-learn + Joblib |
 | **Worker**        | Procesamiento asincrónico              | Consumer de cola      |
-| **Messaging**     | Eventos / desacople                    | RabbitMQ / Kafka      |
+| **Messaging**     | Eventos / desacople                    | RabbitMQ + aio-pika   |
 | **Persistence**   | Historial de predicciones, jobs        | PostgreSQL            |
 | **Observability** | Logs, métricas, dashboards             | Prometheus + Grafana  |
 
@@ -96,19 +95,26 @@ Response:
 - Devuelve `job_id` con estado inicial `PENDING`.
 - Worker procesa registros y actualiza estado: `PROCESSING` → `COMPLETED` / `FAILED`.
 
-### Evento `risk_prediction_requested` (S5+)
+### Mensaje `batch_jobs.process` (S5+)
 
 ```json
 {
-  "event_id": "uuid",
-  "event_type": "risk_prediction_requested",
-  "payload": {
-    "request_id": "uuid",
-    "customer_data": { ... }
-  },
-  "created_at": "2026-05-20T12:34:56Z"
+  "job_id": "uuid"
 }
 ```
+
+### GET /metrics (S6)
+
+Expone formato Prometheus. Series principales:
+
+- `risk_http_requests_total{method,route,status_code}`
+- `risk_http_request_latency_seconds{method,route}`
+- `risk_predictions_total{model_version,risk_level,source}`
+- `risk_prediction_latency_seconds{source}`
+- `risk_prediction_errors_total{error_type}`
+- `risk_batch_jobs_total{status}`
+- `risk_batch_job_duration_seconds`
+- `risk_model_inference_latency_seconds`
 
 ---
 
@@ -133,6 +139,7 @@ batch_jobs (
   total_records   INTEGER NOT NULL,
   processed       INTEGER NOT NULL DEFAULT 0,
   failed          INTEGER NOT NULL DEFAULT 0,
+  csv_blob        BYTEA NULL,
   started_at      TIMESTAMPTZ,
   finished_at     TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()

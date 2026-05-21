@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.api.routes import batch, health, metrics, predictions
 from app.config import get_settings
 from app.db.database import create_engine_from_settings, create_session_factory
+from app.observability import configure_logging, install_observability_middleware
 from app.queue import RabbitConnection
 from app.services.model_service import ModelService
 
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    configure_logging(settings.log_level)
 
     # Database first — if the DB is down, fail fast before loading the model.
     engine = create_engine_from_settings(settings)
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+    install_observability_middleware(app)
     app.include_router(health.router)
     app.include_router(predictions.router)
     app.include_router(batch.router)
