@@ -8,22 +8,20 @@ Backend platform que expone un modelo simple de **risk scoring** en condiciones 
 
 ## Estado actual
 
-Semana en curso: **S1 — Fundamentos + FastAPI** (ver [docs/semana-1.md](docs/semana-1.md)).
+Semana en curso: **S5 — Cola + worker asincrónico** (ver [docs/semana-5.md](docs/semana-5.md)).
 
 | Semana | Tema                                  | Tag    | Estado    |
 | ------ | ------------------------------------- | ------ | --------- |
-| S1     | FastAPI + endpoints mock              | `v0.1` | en curso  |
-| S2     | Modelo Scikit-learn + inferencia real | `v0.2` | pendiente |
-| S3     | PostgreSQL + historial                | `v0.3` | pendiente |
-| S4     | Jobs batch + CSV                      | `v0.4` | pendiente |
-| S5     | Cola + worker asincrónico             | `v0.5` | pendiente |
+| S1     | FastAPI + endpoints mock              | `v0.1` | hecho     |
+| S2     | Modelo Scikit-learn + inferencia real | `v0.2` | hecho     |
+| S3     | PostgreSQL + historial                | `v0.3` | hecho     |
+| S4     | Jobs batch + CSV                      | `v0.4` | hecho     |
+| S5     | Cola + worker asincrónico             | `v0.5` | en curso  |
 | S6     | Observabilidad + portfolio            | `v1.0` | pendiente |
 
 ---
 
-> ⚠️ **Modelo de juguete (v0.2).** El scoring usa un `LogisticRegression` (Scikit-learn) entrenado sobre un **dataset sintético**. No es predictivo en producción; el objetivo es ejercitar el ciclo entrenamiento → serialización → carga. `model_version` viene de `.env` (`MODEL_VERSION=v0.2.0` por default).
->
-> `GET /predictions/{id}` responde **501 Not Implemented** hasta que entre persistencia en S3 (`v0.3`).
+> ⚠️ **Modelo de juguete.** El scoring usa un `LogisticRegression` (Scikit-learn) entrenado sobre un **dataset sintético**. No es predictivo en producción; el objetivo es ejercitar el ciclo entrenamiento → serialización → carga. `model_version` viene de `.env` (`MODEL_VERSION=v0.2.0` por default).
 
 ## Cómo empezar
 
@@ -39,8 +37,8 @@ python -m venv .venv
 # dependencias
 pip install -r requirements.txt
 
-# levantar PostgreSQL local (puerto 55432 por defecto, configurable en .env)
-docker compose up -d postgres
+# levantar PostgreSQL + RabbitMQ local
+docker compose up -d postgres rabbitmq
 
 # aplicar migraciones
 alembic upgrade head
@@ -69,10 +67,10 @@ Imprime métricas (accuracy / precision / recall / F1 / confusion matrix) sobre 
 PostgreSQL corre en Docker (`docker-compose.yml`). El puerto mapeado es **55432** para no chocar con instalaciones nativas en 5432/5433.
 
 ```powershell
-# solo DB (modo dev: la API corre con uvicorn en el host)
-docker compose up -d postgres
+# solo infra (modo dev: la API corre con uvicorn en el host)
+docker compose up -d postgres rabbitmq
 
-# stack completo (DB + API juntos, API en :8000, migra automáticamente)
+# stack completo (Postgres + RabbitMQ + API + worker, API en :8000, migra automáticamente)
 docker compose up -d --build
 
 # parar (mantiene datos)
@@ -82,7 +80,7 @@ docker compose stop
 docker compose down -v
 ```
 
-El servicio `api` aplica `alembic upgrade head` al arrancar y luego levanta `uvicorn`.
+El servicio `api` aplica `alembic upgrade head` al arrancar y luego levanta `uvicorn`. RabbitMQ expone AMQP en `:5672` y la UI de management en http://localhost:15672 (`guest`/`guest` por default).
 
 ### Migraciones (Alembic)
 
@@ -112,11 +110,14 @@ pytest -m "not integration"
 
 # solo integration
 pytest -m integration
+
+# tests del worker (requieren RabbitMQ corriendo)
+pytest -m worker
 ```
 
 ### Predicciones batch (CSV)
 
-`POST /batch-predictions` acepta un CSV con headers `income,age,debt,employment_years,external_id` (los primeros 4 obligatorios; `external_id` opcional, da idempotencia por job). El servidor responde `202` con `job_id` y procesa en background.
+`POST /batch-predictions` acepta un CSV con headers `income,age,debt,employment_years,external_id` (los primeros 4 obligatorios; `external_id` opcional, da idempotencia por job). El servidor responde `202` con `job_id`, publica el job en RabbitMQ y el worker lo procesa mientras el cliente consulta estado por polling.
 
 ```powershell
 # 1) Subir el CSV (devuelve job_id y 'Location' header)

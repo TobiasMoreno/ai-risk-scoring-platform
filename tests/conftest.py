@@ -53,6 +53,17 @@ class FakeModelService:
         return PredictionResult(response=response, latency_ms=1)
 
 
+class FakeRabbitConnection:
+    def __init__(self) -> None:
+        self.published_job_ids: list[str] = []
+        self.fail_publish = False
+
+    async def publish_job(self, job_id) -> None:
+        if self.fail_publish:
+            raise RuntimeError("publish failed")
+        self.published_job_ids.append(str(job_id))
+
+
 def _build_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -194,12 +205,20 @@ async def client_with_batch_db(
 ) -> AsyncIterator[AsyncClient]:
     app = _build_app()
     fake_model = FakeModelService()
+    fake_rabbit = FakeRabbitConnection()
     app.state.model_service = fake_model
     app.state.session_factory = batch_session_factory
+    app.state.rabbit_connection = fake_rabbit
     app.dependency_overrides[get_model_service] = lambda: fake_model
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.fake_rabbit = fake_rabbit
         yield ac
+
+
+@pytest.fixture
+def fake_rabbit(client_with_batch_db: AsyncClient) -> FakeRabbitConnection:
+    return client_with_batch_db.fake_rabbit
 
 
 @pytest.fixture
@@ -211,3 +230,22 @@ def batch_service(
         session_factory=batch_session_factory,
         chunk_size=1000,
     )
+
+
+@pytest.fixture
+async def rabbitmq_channel():
+    aio_pika = pytest.importorskip("aio_pika")
+    settings = get_settings()
+    try:
+        connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    except Exception as exc:
+        pytest.skip(f"RabbitMQ not available at {settings.rabbitmq_url}: {exc}")
+
+    channel = await connection.channel()
+    queue = await channel.declare_queue(settings.rabbitmq_queue_batch, durable=True)
+    await queue.purge()
+    try:
+        yield channel
+    finally:
+        await queue.purge()
+        await connection.close()

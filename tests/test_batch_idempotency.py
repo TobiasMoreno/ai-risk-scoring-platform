@@ -42,7 +42,7 @@ async def test_reprocessing_same_job_does_not_duplicate(
     response = await client_with_batch_db.post("/batch-predictions", files=files)
     job_id = UUID(response.json()["job_id"])
 
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
 
     # Force the job back to PROCESSING and reprocess — exercises the UNIQUE
     # idempotency conflict path, not the "already terminal" short-circuit.
@@ -52,9 +52,10 @@ async def test_reprocessing_same_job_does_not_duplicate(
         ).scalar_one()
         job.status = "PROCESSING"
         job.processed = 0
+        job.csv_blob = VALID_CSV
         s.commit()
 
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
 
     with batch_session_factory() as s:
         count = s.execute(
@@ -75,7 +76,7 @@ async def test_duplicate_external_id_within_job_is_skipped(
     response = await client_with_batch_db.post("/batch-predictions", files=files)
     job_id = UUID(response.json()["job_id"])
 
-    batch_service.process_job(job_id, DUPLICATE_CSV)
+    batch_service.process_job(job_id)
 
     with batch_session_factory() as s:
         job = s.execute(
@@ -103,9 +104,9 @@ async def test_terminal_job_is_not_reprocessed(
     response = await client_with_batch_db.post("/batch-predictions", files=files)
     job_id = UUID(response.json()["job_id"])
 
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
     # Second call should be a no-op because status is COMPLETED.
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
 
     with batch_session_factory() as s:
         count = s.execute(

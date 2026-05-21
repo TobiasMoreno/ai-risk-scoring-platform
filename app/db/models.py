@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, Index, Integer, String, func
+from sqlalchemy import BigInteger, DateTime, Index, Integer, LargeBinary, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -51,6 +51,7 @@ class BatchJob(Base):
     total_records: Mapped[int] = mapped_column(Integer, nullable=False)
     processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    csv_blob: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -28,7 +28,7 @@ async def test_get_results_paginates(
     files = {"file": ("in.csv", BytesIO(VALID_CSV), "text/csv")}
     response = await client_with_batch_db.post("/batch-predictions", files=files)
     job_id = UUID(response.json()["job_id"])
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
 
     page = await client_with_batch_db.get(
         f"/batch-predictions/{job_id}/results?limit=2&offset=2"
@@ -50,7 +50,7 @@ async def test_get_job_status_completed(
     files = {"file": ("in.csv", BytesIO(VALID_CSV), "text/csv")}
     response = await client_with_batch_db.post("/batch-predictions", files=files)
     job_id = UUID(response.json()["job_id"])
-    batch_service.process_job(job_id, VALID_CSV)
+    batch_service.process_job(job_id)
 
     status_resp = await client_with_batch_db.get(f"/batch-predictions/{job_id}")
     assert status_resp.status_code == 200

@@ -407,3 +407,32 @@ A — `FAILED` reservado para "no se persistió nada"; si al menos una fila entr
 ## ADR-17 — OpenTelemetry sí o no (S6)
 
 -->
+
+---
+
+## ADR-14 - RabbitMQ + aio-pika para batch
+
+- **Fecha**: 2026-05-21
+- **Semana**: S5
+- **Estado**: aceptada
+
+### Contexto
+S4 procesaba CSVs dentro de la API con `BackgroundTasks`. Si la API se reiniciaba en mitad de un job, el estado quedaba colgado en `PROCESSING`, y el trabajo batch competia por recursos con requests online.
+
+### Opciones consideradas
+- A: RabbitMQ + `aio-pika`.
+- B: Kafka.
+- C: Postgres como cola con `SKIP LOCKED`.
+- D: Redis Streams.
+
+### Decision
+A: una cola durable RabbitMQ (`batch_jobs.process`) y un worker separado, usando `aio-pika` tanto para publicar como para consumir.
+
+### Razon
+RabbitMQ encaja con el patron work-queue: una cola, N consumers, ack manual y requeue. Kafka es demasiado pesado para un unico flujo de jobs; Postgres como cola evita nueva infra pero no ejercita mensajeria; Redis Streams es viable pero menos directo para este caso. `aio-pika` encaja con FastAPI y evita bloquear el endpoint async.
+
+### Consecuencias
+- La API solo valida, persiste `csv_blob` y publica un `{job_id}`; el worker hace el procesamiento.
+- `csv_blob` vive temporalmente en DB para que API y worker no dependan de filesystem compartido.
+- El worker puede escalar horizontalmente y hace recovery de jobs huerfanos al startup.
+- No hay DLQ sofisticada en S5; mensajes de datos invalidos se nackean sin requeue y quedan marcados `FAILED`.

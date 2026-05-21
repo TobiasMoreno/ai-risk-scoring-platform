@@ -13,13 +13,16 @@ class BatchJobRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def create(self, *, job_id: UUID, total_records: int) -> BatchJob:
+    def create(
+        self, *, job_id: UUID, total_records: int, csv_blob: bytes | None = None
+    ) -> BatchJob:
         job = BatchJob(
             job_id=job_id,
             status="PENDING",
             total_records=total_records,
             processed=0,
             failed=0,
+            csv_blob=csv_blob,
         )
         self._session.add(job)
         self._session.flush()
@@ -52,12 +55,12 @@ class BatchJobRepository:
         self._session.execute(
             update(BatchJob)
             .where(BatchJob.job_id == job_id)
-            .values(status="COMPLETED", finished_at=func.now())
+            .values(status="COMPLETED", finished_at=func.now(), csv_blob=None)
         )
 
     def mark_failed(self, job_id: UUID) -> None:
         self._session.execute(
             update(BatchJob)
             .where(BatchJob.job_id == job_id)
-            .values(status="FAILED", finished_at=func.now())
+            .values(status="FAILED", finished_at=func.now(), csv_blob=None)
         )

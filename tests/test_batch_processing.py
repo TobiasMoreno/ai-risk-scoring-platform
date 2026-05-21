@@ -46,7 +46,7 @@ async def _submit_and_process(
     response = await client.post("/batch-predictions", files=files)
     assert response.status_code == 202
     job_id = UUID(response.json()["job_id"])
-    service.process_job(job_id, csv_bytes)
+    service.process_job(job_id)
     return job_id
 
 
@@ -67,6 +67,7 @@ async def test_full_happy_path_persists_all_rows(
         assert job.status == "COMPLETED"
         assert job.processed == 5
         assert job.failed == 0
+        assert job.csv_blob is None
         rows = s.execute(
             select(PredictionRequest).where(PredictionRequest.job_id == job_id)
         ).scalars().all()
@@ -114,3 +115,4 @@ async def test_all_invalid_rows_marks_job_failed(
         assert job.status == "FAILED"
         assert job.processed == 0
         assert job.failed == 3
+        assert job.csv_blob is None

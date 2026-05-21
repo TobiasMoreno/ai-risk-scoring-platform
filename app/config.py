@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     batch_chunk_size: int = 1000
     batch_max_upload_bytes: int = 10 * 1024 * 1024
 
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    rabbitmq_queue_batch: str = "batch_jobs.process"
+    batch_orphan_threshold_seconds: int = 600
+    worker_prefetch_count: int = 1
+
 
 @lru_cache
 def get_settings() -> Settings:

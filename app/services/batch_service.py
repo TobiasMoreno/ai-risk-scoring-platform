@@ -28,6 +28,22 @@ class BatchTooLargeError(Exception):
     """Raised when the upload exceeds the configured max size."""
 
 
+def read_and_validate_csv(stream: BinaryIO, max_bytes: int) -> tuple[bytes, int]:
+    raw = stream.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise BatchTooLargeError(f"Upload exceeds {max_bytes} bytes")
+
+    text_stream = io.StringIO(raw.decode("utf-8"))
+    reader = csv.DictReader(text_stream)
+    headers = set(reader.fieldnames or [])
+    missing = REQUIRED_COLUMNS - headers
+    if missing:
+        raise BatchValidationError(f"Missing required CSV columns: {sorted(missing)}")
+
+    total_records = sum(1 for _ in reader)
+    return raw, total_records
+
+
 class BatchService:
     def __init__(
         self,
@@ -45,27 +61,14 @@ class BatchService:
     def create_job(
         self, stream: BinaryIO, max_bytes: int
     ) -> tuple[BatchJob, bytes]:
-        raw = stream.read(max_bytes + 1)
-        if len(raw) > max_bytes:
-            raise BatchTooLargeError(
-                f"Upload exceeds {max_bytes} bytes"
-            )
-
-        text_stream = io.StringIO(raw.decode("utf-8"))
-        reader = csv.DictReader(text_stream)
-        headers = set(reader.fieldnames or [])
-        missing = REQUIRED_COLUMNS - headers
-        if missing:
-            raise BatchValidationError(
-                f"Missing required CSV columns: {sorted(missing)}"
-            )
-
-        total_records = sum(1 for _ in reader)
+        raw, total_records = read_and_validate_csv(stream, max_bytes)
 
         job_id = uuid4()
         with self._session_factory() as session:
             repo = BatchJobRepository(session)
-            job = repo.create(job_id=job_id, total_records=total_records)
+            job = repo.create(
+                job_id=job_id, total_records=total_records, csv_blob=raw
+            )
             session.commit()
             session.refresh(job)
 
@@ -74,9 +77,22 @@ class BatchService:
         )
         return job, raw
 
+    def create_job_in_session(
+        self, session: Session, stream: BinaryIO, max_bytes: int
+    ) -> tuple[BatchJob, bytes]:
+        raw, total_records = read_and_validate_csv(stream, max_bytes)
+        job_id = uuid4()
+        job = BatchJobRepository(session).create(
+            job_id=job_id, total_records=total_records, csv_blob=raw
+        )
+        logger.info(
+            "batch job created job_id=%s total_records=%d", job_id, total_records
+        )
+        return job, raw
+
     # ---------- Processing ----------
 
-    def process_job(self, job_id: UUID, raw_bytes: bytes) -> None:
+    def process_job(self, job_id: UUID, raw_bytes: bytes | None = None) -> None:
         with self._session_factory() as session:
             repo = BatchJobRepository(session)
             job = repo.get_by_job_id(job_id)
@@ -90,12 +106,35 @@ class BatchService:
                     job.status,
                 )
                 return
+            persisted_bytes = job.csv_blob
+            if raw_bytes is None:
+                raw_bytes = persisted_bytes
+            if raw_bytes is None:
+                repo.mark_failed(job_id)
+                session.commit()
+                logger.error("process_job: job_id=%s has no csv_blob", job_id)
+                return
             total_records = job.total_records
             repo.mark_processing(job_id)
             session.commit()
 
-        text_stream = io.StringIO(raw_bytes.decode("utf-8"))
+        try:
+            text_stream = io.StringIO(raw_bytes.decode("utf-8"))
+        except UnicodeDecodeError:
+            with self._session_factory() as session:
+                BatchJobRepository(session).mark_failed(job_id)
+                session.commit()
+            raise BatchValidationError("CSV must be UTF-8 encoded")
+
         reader = csv.DictReader(text_stream)
+        missing = REQUIRED_COLUMNS - set(reader.fieldnames or [])
+        if missing:
+            with self._session_factory() as session:
+                BatchJobRepository(session).mark_failed(job_id)
+                session.commit()
+            raise BatchValidationError(
+                f"Missing required CSV columns: {sorted(missing)}"
+            )
 
         chunk: list[dict[str, str]] = []
         chunk_index = 0

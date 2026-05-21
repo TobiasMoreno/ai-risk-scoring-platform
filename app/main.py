@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.api.routes import batch, health, metrics, predictions
 from app.config import get_settings
 from app.db.database import create_engine_from_settings, create_session_factory
+from app.queue import RabbitConnection
 from app.services.model_service import ModelService
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     model.load()
     app.state.model_service = model
 
+    rabbit = RabbitConnection(settings)
+    await rabbit.connect()
+    app.state.rabbit_connection = rabbit
+    logger.info("RabbitMQ connected queue=%s", settings.rabbitmq_queue_batch)
+
     try:
         yield
     finally:
+        await rabbit.close()
         engine.dispose()
 
 

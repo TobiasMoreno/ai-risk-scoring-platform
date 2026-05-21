@@ -4,7 +4,6 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     HTTPException,
@@ -47,15 +46,27 @@ def _build_service(request: Request, settings: Settings) -> BatchService:
 async def submit_batch(
     request: Request,
     response: Response,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     settings: Settings = Depends(get_settings),
 ) -> BatchSubmitResponse:
     service = _build_service(request, settings)
+    session_factory: sessionmaker[Session] = request.app.state.session_factory
+    publisher = request.app.state.rabbit_connection
     try:
-        job, raw_bytes = service.create_job(
-            stream=file.file, max_bytes=settings.batch_max_upload_bytes
-        )
+        with session_factory() as session:
+            job, _raw_bytes = service.create_job_in_session(
+                session, stream=file.file, max_bytes=settings.batch_max_upload_bytes
+            )
+            try:
+                await publisher.publish_job(job.job_id)
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to enqueue batch job",
+                ) from exc
+            session.commit()
+            session.refresh(job)
     except BatchTooLargeError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
@@ -71,8 +82,6 @@ async def submit_batch(
         ) from exc
 
     response.headers["Location"] = f"/batch-predictions/{job.job_id}"
-
-    background_tasks.add_task(service.process_job, job.job_id, raw_bytes)
 
     return BatchSubmitResponse(
         job_id=job.job_id, status=job.status, total_records=job.total_records

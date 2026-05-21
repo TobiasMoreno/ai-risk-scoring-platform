@@ -15,11 +15,29 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     image: risk-api:latest
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
       # Inside the compose network the DB is reachable as host "postgres" on the internal port 5432.
@@ -30,10 +48,37 @@ services:
       APP_VERSION: ${APP_VERSION:-0.3.0}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672/
+      RABBITMQ_QUEUE_BATCH: ${RABBITMQ_QUEUE_BATCH:-batch_jobs.process}
+      BATCH_ORPHAN_THRESHOLD_SECONDS: ${BATCH_ORPHAN_THRESHOLD_SECONDS:-600}
+      WORKER_PREFETCH_COUNT: ${WORKER_PREFETCH_COUNT:-1}
     ports:
       - "${APP_PORT:-8000}:8000"
     # Run pending migrations, then start uvicorn.
     command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
+  worker:
+    build: .
+    image: risk-api:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-risk}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-risk_scoring}
+      MODEL_PATH: app/models/risk_model.joblib
+      MODEL_VERSION: ${MODEL_VERSION:-v0.2.0}
+      APP_NAME: ${APP_NAME:-AI Risk Scoring Platform}
+      APP_VERSION: ${APP_VERSION:-0.3.0}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672/
+      RABBITMQ_QUEUE_BATCH: ${RABBITMQ_QUEUE_BATCH:-batch_jobs.process}
+      BATCH_ORPHAN_THRESHOLD_SECONDS: ${BATCH_ORPHAN_THRESHOLD_SECONDS:-600}
+      WORKER_PREFETCH_COUNT: ${WORKER_PREFETCH_COUNT:-1}
+    command: ["python", "-m", "app.worker.main"]
+
 volumes:
   pgdata:
+  rabbitmq_data:

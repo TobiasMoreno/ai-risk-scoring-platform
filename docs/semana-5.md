@@ -4,6 +4,28 @@
 
 **Tag al cerrar:** `v0.5`
 
+## Resumen del sprint
+
+- RabbitMQ corre en Docker Compose con UI en http://localhost:15672.
+- La API valida el CSV, guarda `csv_blob`, crea el job `PENDING` y publica `{job_id}` en `batch_jobs.process`.
+- El worker separado (`python -m app.worker.main`) consume con ack manual, procesa desde DB, limpia `csv_blob` al finalizar y recupera jobs huerfanos al startup.
+- Los tests agregan marca `worker` y cubren processor/recovery; los tests de submission ya validan enqueue en vez de procesamiento inline.
+
+## Como testear localmente
+
+```powershell
+docker compose up -d postgres rabbitmq
+alembic upgrade head
+pytest -m integration
+pytest -m worker
+```
+
+Stack completo:
+
+```powershell
+docker compose up -d --build
+```
+
 ---
 
 ## Qué estudiar
